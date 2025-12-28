@@ -31,6 +31,10 @@ export class TerminalSession {
         this.shell = options.shell;
         this.initialCwd = options.initialCwd;
 
+        // Save PTY dimensions for restart
+        this._ptyCols = pty.cols;
+        this._ptyRows = pty.rows;
+
         this.title = this.shell ? this.shell.split('/').pop() : 'Terminal';
         this.cwd = this.initialCwd;
         this.inputBuffer = '';
@@ -52,6 +56,8 @@ export class TerminalSession {
         this.captureStartedAt = null;
         this.lastExecution = null;
         this.skipNextShellLog = false;
+        this.restarting = false; // Flag to prevent restart loops
+        this.ready = true; // Track if PTY is ready to receive input
 
         this.ansiParser = new AnsiParser({
             inst_o: (s) => {
@@ -80,6 +86,12 @@ export class TerminalSession {
             if (this.suppressPtyOutput) return;
 
             if (typeof chunk !== 'string') chunk = chunk.toString('utf8');
+
+            // Log PTY output for debugging
+            if (chunk.length > 0) {
+                const truncated = chunk.length > 100 ? chunk.substring(0, 100) + '...' : chunk;
+                console.log(`[Session ${this.id}] PTY output (${chunk.length} chars):`, truncated.replace(/\n/g, '\\n').replace(/\r/g, '\\r'));
+            }
 
             if (this.manager) {
                 this.manager.appendLog(this.id, chunk);
@@ -239,13 +251,17 @@ export class TerminalSession {
 
     attach(ws) {
         if (!ws) throw new Error('WebSocket instance required');
+
+        // Don't restart PTY on attach - let user trigger it by typing
+        console.log(`[Session ${this.id}] Attaching WebSocket, PTY closed: ${this.closed}`);
+
         this.clients.add(ws);
         ws.once('close', () => this.clients.delete(ws));
         ws.on('message', (raw) => this._routeIncoming(raw, ws));
         ws.on('error', () => ws.close());
 
         this._send(ws, { type: 'snapshot', data: this.history });
-        this._send(ws, { type: 'meta', title: this.title, cwd: this.cwd, env: this.env, cols: this.pty.cols, rows: this.pty.rows });
+        this._send(ws, { type: 'meta', title: this.title, cwd: this.cwd, env: this.env, cols: this._ptyCols || 80, rows: this._ptyRows || 24 });
         if (this.closed) {
             this._send(ws, { type: 'status', status: 'terminated' });
         } else {
@@ -261,7 +277,19 @@ export class TerminalSession {
     }
 
     resize(cols, rows) {
-        if (this.closed) return;
+        this._ptyCols = cols;
+        this._ptyRows = rows;
+
+        if (this.restarting) {
+            console.log(`[Session ${this.id}] PTY restarting, skipping resize`);
+            return;
+        }
+
+        if (this.closed) {
+            console.log(`[Session ${this.id}] PTY closed, restarting for resize...`);
+            this.restartPty();
+            return;
+        }
         this.pty.resize(cols, rows);
         this._broadcast({ type: 'meta', title: this.title, cwd: this.cwd, env: this.env, cols, rows });
         if (this.manager && this.manager.saveSessionState) {
@@ -283,7 +311,25 @@ export class TerminalSession {
     }
 
     _handleInput(data) {
-        if (this.closed || typeof data !== 'string') return;
+        if (typeof data !== 'string') return;
+
+        // Don't process input if PTY is restarting
+        if (this.restarting) {
+            console.log(`[Session ${this.id}] PTY restarting, dropping input:`, data);
+            return;
+        }
+
+        if (this.closed) {
+            console.log(`[Session ${this.id}] PTY closed, restarting for input...`);
+            this.restartPty();
+            // Buffer the input to send after PTY is ready
+            setTimeout(() => {
+                if (this.ready) {
+                    this.write(data);
+                }
+            }, 1000);
+            return;
+        }
         this.write(data);
     }
 
@@ -903,6 +949,89 @@ export class TerminalSession {
         }
         this._appendHistory(text);
         this._broadcast({ type: 'output', data: text });
+    }
+
+    restartPty() {
+        if (this.restarting) {
+            console.log(`[Session ${this.id}] Already restarting PTY, skipping`);
+            return;
+        }
+
+        this.restarting = true;
+        console.log(`[Session ${this.id}] Starting PTY restart...`);
+
+        // Unsubscribe from old PTY events
+        this.dataSubscription?.dispose?.();
+        this.exitSubscription?.dispose?.();
+
+        // Import pty module
+        const ptyModule = require('node-pty');
+
+        // Check if bash exists
+        const fs = require('node:fs');
+        const shell = fs.existsSync('/bin/bash') ? '/bin/bash' : '/bin/sh';
+        const args = shell === '/bin/bash' ? ['-i', '--norc', '--noprofile'] : [];
+
+        console.log(`[Session ${this.id}] Spawning PTY: ${shell} ${args.join(' ')} in ${this.cwd}, size: ${this._ptyCols}x${this._ptyRows}`);
+
+        // Create new PTY with minimal configuration
+        const newPty = ptyModule.spawn(
+            shell,
+            args,
+            {
+                name: 'xterm-256color',
+                cols: this._ptyCols || 80,
+                rows: this._ptyRows || 24,
+                cwd: this.cwd,
+                env: {
+                    HOME: process.env.HOME,
+                    USER: process.env.USER,
+                    PATH: process.env.PATH,
+                    TERM: 'xterm-256color'
+                },
+                encoding: 'utf8'
+            }
+        );
+
+        // Replace old PTY
+        this.pty = newPty;
+        this.closed = false;
+
+        // Mark as not ready initially
+        this.ready = false;
+        this.noOutputCount = 0; // Counter for no output events
+
+        // Re-subscribe to events with output monitoring
+        this.dataSubscription = this.pty.onData((chunk) => {
+            this.noOutputCount = 0; // Reset counter on any output
+
+            // First output means PTY is ready
+            if (!this.ready && chunk.length > 0) {
+                this.ready = true;
+                console.log(`[Session ${this.id}] PTY is now ready, received ${chunk.length} bytes`);
+            }
+            this._handleData(chunk);
+        });
+
+        this.exitSubscription = this.pty.onExit((details) => {
+            console.log(`[Session ${this.id}] PTY exited during restart:`, details);
+            this._handleExit(details);
+        });
+
+        console.log(`[Session ${this.id}] PTY restarted successfully, PID: ${newPty.pid}`);
+
+        // Check if PTY is still alive after 500ms
+        setTimeout(() => {
+            if (!this.ready) {
+                console.log(`[Session ${this.id}] PTY has not produced output yet, checking status...`);
+            }
+        }, 500);
+
+        // Reset restart flag after a longer delay
+        setTimeout(() => {
+            this.restarting = false;
+            console.log(`[Session ${this.id}] Restart flag reset, ready: ${this.ready}`);
+        }, 3000);
     }
 }
 

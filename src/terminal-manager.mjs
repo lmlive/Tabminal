@@ -168,8 +168,10 @@ precmd_functions+=(_tabminal_zsh_apply_prompt_marker)
         // Initial save
         this.saveSessionState(session);
 
-        ptyProcess.onExit(() => {
-            this.removeSession(id);
+        ptyProcess.onExit((details) => {
+            console.log(`[Manager] PTY exited for session ${id}:`, JSON.stringify(details));
+            // Don't auto-remove session - let it stay so it can be displayed in UI
+            // This allows users to see historical sessions and manually manage them
             // Cleanup temp files
             try {
                 if (initFilePath && fs.existsSync(initFilePath)) fs.unlinkSync(initFilePath);
@@ -236,11 +238,12 @@ precmd_functions+=(_tabminal_zsh_apply_prompt_marker)
             this.sessions.delete(id);
             persistence.deleteSession(id);
             console.log(`[Manager] Removed session ${id}`);
-            // If the last session is closed, create a new one automatically
-            if (this.sessions.size === 0 && !this.disposing) {
-                console.log('[Manager] No sessions left, creating a new one.');
-                this.createSession();
-            }
+            // If the last session is closed, create a new one automatically (only if there are active clients)
+            // For now, don't auto-create to avoid PTY exit loops
+            // if (this.sessions.size === 0 && !this.disposing) {
+            //     console.log('[Manager] No sessions left, creating a new one.');
+            //     this.createSession();
+            // }
         }
     }
 

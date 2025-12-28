@@ -985,8 +985,11 @@ class Session {
     }
 
     handleMessage(message) {
+        console.log(`[Session ${this.id}] Received WebSocket message:`, message.type, message.data ? `(${message.data.length} chars)` : '');
+
         switch (message.type) {
             case 'snapshot':
+                console.log(`[Session ${this.id}] Received snapshot, restoring history (${message.data?.length || 0} chars)`);
                 if (this.previewTerm) this.previewTerm.reset();
                 this.mainTerm.reset();
                 this.history = message.data || '';
@@ -995,13 +998,16 @@ class Session {
                 this.mainTerm.write(this.history, () => { this.isRestoring = false; });
                 break;
             case 'output':
+                console.log(`[Session ${this.id}] Received output:`, message.data);
                 this.history += message.data;
                 this.writeToTerminals(message.data);
                 break;
             case 'meta':
+                console.log(`[Session ${this.id}] Received meta:`, message);
                 this.update(message);
                 break;
             case 'status':
+                console.log(`[Session ${this.id}] Received status:`, message.status);
                 if (state.activeSessionId === this.id) setStatus(message.status);
                 break;
         }
@@ -1879,27 +1885,66 @@ async function switchToSession(sessionId) {
     if (!sessionId || !state.sessions.has(sessionId)) return;
     if (state.activeSessionId === sessionId) return;
 
+    console.log(`[switchToSession] Switching to session ${sessionId}`);
     state.activeSessionId = sessionId;
     renderTabs();
 
     const session = state.sessions.get(sessionId);
-    
+
+    // Force hide editor pane to ensure terminal is visible
+    const editorPane = document.getElementById('editor-pane');
+    if (editorPane) {
+        console.log(`[switchToSession] Hiding editor pane`);
+        editorPane.style.display = 'none';
+    }
+
+    const editorResizer = document.getElementById('editor-resizer');
+    if (editorResizer) {
+        console.log(`[switchToSession] Hiding editor resizer`);
+        editorResizer.style.display = 'none';
+    }
+
+    // Ensure terminal wrapper is visible
+    const terminalWrapper = document.getElementById('terminal-wrapper');
+    if (terminalWrapper) {
+        console.log(`[switchToSession] Showing terminal wrapper`);
+        terminalWrapper.style.display = 'flex';
+        terminalWrapper.style.flex = '1 1 0%';
+    }
+
     // Clear main view
+    console.log(`[switchToSession] Clearing terminal element, children:`, terminalEl.children.length);
     terminalEl.innerHTML = '';
-    
+
     // Mount new session
+    console.log(`[switchToSession] Mounting xterm to terminal element`);
     session.mainTerm.open(terminalEl);
+    console.log(`[switchToSession] Terminal element children after open:`, terminalEl.children.length);
+
     session.mainFitAddon.fit();
     session.mainTerm.focus();
-    
+
+    console.log(`[switchToSession] Terminal dimensions:`, session.mainTerm.cols, 'x', session.mainTerm.rows);
+
     // Double check focus
     requestAnimationFrame(() => {
         session.mainTerm.focus();
+        console.log(`[switchToSession] Focused terminal after animation frame`);
     });
-    
+
     session.reportResize();
-    
-    // Sync editor state
+
+    console.log(`[switchToSession] WebSocket state:`, session.socket?.readyState, session.socket?.url);
+
+    // Trigger PTY restart if needed by sending an empty input
+    // This ensures that PTY is active on the server side
+    // The empty input will trigger to PTY restart logic on the server
+    setTimeout(() => {
+        console.log(`[switchToSession] Sending input to trigger PTY restart`);
+        session.send({ type: 'input', data: '\r' });
+    }, 100);
+
+    // Sync editor state (but keep editor hidden)
     editorManager.switchTo(session);
 }
 

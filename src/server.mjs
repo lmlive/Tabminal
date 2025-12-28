@@ -78,18 +78,18 @@ app.use(authMiddleware);
 const systemMonitor = new SystemMonitor();
 const terminalManager = new TerminalManager();
 
-// Restore sessions
-(async () => {
-    const restoredSessions = await persistence.loadSessions();
-    if (restoredSessions.length > 0) {
-        console.log(`[Server] Restoring ${restoredSessions.length} sessions...`);
-        for (const data of restoredSessions) {
-            terminalManager.createSession(data);
-        }
-    } else {
-        terminalManager.ensureOneSession();
-    }
-})();
+// Don't auto-create sessions on startup - they will be created when clients connect
+// (async () => {
+//     const restoredSessions = await persistence.loadSessions();
+//     if (restoredSessions.length > 0) {
+//         console.log(`[Server] Restoring ${restoredSessions.length} sessions...`);
+//         for (const data of restoredSessions) {
+//             terminalManager.createSession(data);
+//         }
+//     } else {
+//         terminalManager.ensureOneSession();
+//     }
+// })();
 
 // Setup FS Routes
 setupFsRoutes(router);
@@ -213,11 +213,11 @@ httpServer.on('upgrade', (request, socket, head) => {
         const sessionId = match[1];
 
         wss.handleUpgrade(request, socket, head, (ws) => {
-            const session = terminalManager.getSession(sessionId);
+            let session = terminalManager.getSession(sessionId);
             if (!session) {
-                console.warn(`[Server] Session not found for ID: ${sessionId}`);
-                ws.close(); // Close the WebSocket connection
-                return;
+                // Auto-create session if it doesn't exist
+                console.log(`[Server] Session not found for ID: ${sessionId}, creating...`);
+                session = terminalManager.createSession();
             }
             const ua = request.headers['user-agent'] || 'Unknown';
             wss.emit('connection', ws, session, ua);
