@@ -181,6 +181,9 @@ Options:
     if (process.env.TABMINAL_DEBUG) finalConfig.debug = true;
     if (process.env.TABMINAL_GOOGLE_KEY) finalConfig.googleKey = process.env.TABMINAL_GOOGLE_KEY;
     if (process.env.TABMINAL_GOOGLE_CX) finalConfig.googleCx = process.env.TABMINAL_GOOGLE_CX;
+    if (process.env.TABMINAL_ACCEPT || process.env.TABMINAL_ACCEPT_TERMS) {
+        finalConfig.acceptTerms = true;
+    }
 
     // Password Logic
     if (!finalConfig.password) {
