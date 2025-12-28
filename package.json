@@ -1,49 +1,51 @@
 {
   "name": "tabminal",
-  "version": "1.1.21",
-  "description": "A modern, persistent web terminal with multi-tab support and real-time system monitoring.",
+  "version": "2.0.0",
+  "description": "A modern, persistent web terminal with multi-tab support and real-time system monitoring. Powered by Bun runtime.",
   "type": "module",
   "bin": {
     "tabminal": "./src/server.mjs"
   },
   "main": "src/server.mjs",
   "scripts": {
-    "start": "node src/server.mjs",
-    "dev": "node --watch src/server.mjs",
-    "build": "node build.mjs",
-    "test": "node --test",
-    "updep": "npx npm-check-updates -u && npm install",
-    "test:watch": "node --test --watch",
-    "lint": "eslint ."
+    "start": "bun src/server.mjs",
+    "dev": "bun --watch src/server.mjs",
+    "build": "bun build.mjs",
+    "test": "bun test",
+    "updep": "bun update",
+    "test:watch": "bun test --watch",
+    "lint": "eslint .",
+    "install:bun": "bun install --production"
   },
   "keywords": [
     "terminal",
     "web-terminal",
     "xterm.js",
-    "node-pty",
+    "bun-pty",
     "websocket",
     "monitoring",
     "dashboard",
-    "cli"
+    "cli",
+    "bun"
   ],
   "author": "Leask Wong",
   "license": "MIT",
   "engines": {
-    "node": ">=22.0.0"
+    "bun": ">=1.0.0"
   },
   "dependencies": {
     "@fontsource/monaspace-neon": "^5.2.5",
     "@koa/router": "^15.0.0",
     "@mozilla/readability": "^0.6.0",
+    "bun-pty": "latest",
     "js-tiktoken": "^1.0.21",
     "jsdom": "^27.2.0",
     "koa": "^3.1.1",
     "koa-bodyparser": "^4.4.1",
     "koa-static": "^5.0.0",
     "node-ansiparser": "^2.2.1",
-    "node-pty": "^1.1.0",
     "openai": "^6.10.0",
-    "utilitas": "^2000.3.26",
+    "utilitas": "^2001.1.112",
     "ws": "^8.18.3"
   },
   "repository": {

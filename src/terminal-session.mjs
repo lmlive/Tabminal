@@ -1,9 +1,11 @@
 import { exec } from 'node:child_process';
 import { promisify } from 'node:util';
 import process from 'node:process';
+import fs from 'node:fs';
 import AnsiParser from 'node-ansiparser';
 import { alan } from 'utilitas';
 import { config } from './config.mjs';
+import { spawn as pty } from 'bun-pty';
 
 const execAsync = promisify(exec);
 const WS_STATE_OPEN = 1;
@@ -148,6 +150,30 @@ export class TerminalSession {
         this.dataSubscription = this.pty.onData(this._handleData);
         this.exitSubscription = this.pty.onExit(this._handleExit);
         this.startTitlePolling();
+    }
+
+    dispose() {
+        console.log(`[Session ${this.id}] Disposing`);
+        this.closed = true;
+        
+        // Cancel event subscriptions
+        if (this.dataSubscription) {
+            this.dataSubscription.dispose();
+        }
+        if (this.exitSubscription) {
+            this.exitSubscription.dispose();
+        }
+        
+        // Kill PTY process
+        try {
+            this.pty.kill();
+        } catch (e) {
+            // ignore
+        }
+        
+        // Clean up other resources
+        this.stopTitlePolling();
+        this.clients.clear();
     }
 
     startTitlePolling() {
@@ -959,23 +985,19 @@ export class TerminalSession {
 
         this.restarting = true;
         console.log(`[Session ${this.id}] Starting PTY restart...`);
-
+        
         // Unsubscribe from old PTY events
         this.dataSubscription?.dispose?.();
         this.exitSubscription?.dispose?.();
-
-        // Import pty module
-        const ptyModule = require('node-pty');
-
+        
         // Check if bash exists
-        const fs = require('node:fs');
         const shell = fs.existsSync('/bin/bash') ? '/bin/bash' : '/bin/sh';
         const args = shell === '/bin/bash' ? ['-i', '--norc', '--noprofile'] : [];
-
+        
         console.log(`[Session ${this.id}] Spawning PTY: ${shell} ${args.join(' ')} in ${this.cwd}, size: ${this._ptyCols}x${this._ptyRows}`);
-
+        
         // Create new PTY with minimal configuration
-        const newPty = ptyModule.spawn(
+        const newPty = pty(
             shell,
             args,
             {

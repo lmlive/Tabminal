@@ -3,6 +3,8 @@
 > **Tab(ter)minal, the Cloud-Native, Proactive AI Integrated Terminal works in modern browsers.**
 > Seamlessly code from your desktop, tablet, or phone with an intelligent, persistent, and rich experience.
 > This project was built using Gemini and Codex wich 80% vibe-coding, means `built for the vibe, with the vibe`.
+>
+> **🚀 Now powered by Bun runtime for blazing fast performance!**
 
 ![Tabminal Banner](public/favicon.svg)
 
@@ -60,7 +62,7 @@ Built from the ground up for **iPadOS** and **iOS**.
 ## 🚀 Getting Started
 
 ### Prerequisites
-*   Node.js >= 22
+*   Bun >= 1.0.0
 *   (Optional) An [OpenRouter](https://openrouter.ai/) API Key if you want AI features.
 *   (Optional) A pair of Google API Key and Search Engine ID (CX) for web search capabilities.
 
@@ -69,25 +71,44 @@ Tabminal provides **full read/write access** to the underlying file system.
 *   **Do NOT expose this to the public internet** without proper protection (VPN, etc).
 *   The `--accept-terms` flag is required to acknowledge that you understand these risks.
 
-### Quick Start (No Install)
-Run directly with `npx`:
+## 🚀 Installation
 
-```bash
-npx tabminal --openrouter-key "YOUR_API_KEY" --accept-terms
-```
-
-### Installation
+### Quick Install (Recommended)
 
 ```bash
 # Clone the repository
 git clone https://github.com/leask/tabminal.git
 cd tabminal
 
+# Run the automated installation script
+bash scripts/install.sh
+```
+
+The install script will:
+- Install/verify Bun runtime
+- Install all dependencies (including bun-pty)
+- Generate a secure password
+- Optionally set up systemd service on Linux
+
+### Manual Install
+
+```bash
+# Install Bun (if not already installed)
+curl -fsSL https://bun.sh/install | bash
+
+# Clone the repository
+git clone https://github.com/leask/tabminal.git
+cd tabminal
+
 # Install dependencies
-npm install
+bun install
+
+# Copy and edit configuration
+cp .env.example .env
+nano .env
 
 # Start the server
-npm start -- --openrouter-key "YOUR_API_KEY" --accept-terms
+bun src/server.mjs --accept-terms
 ```
 
 ### Configuration
@@ -121,9 +142,17 @@ You can configure Tabminal via command-line arguments, environment variables, or
 *   **Virtual `SYM`**: Toggle HHKB keyboard overlay.
 
 ## 🛠 Tech Stack
-*   **Backend**: [Node.js](https://nodejs.org), [Koa](https://github.com/koajs/koa), [node-pty](https://github.com/microsoft/node-pty), [WebSocket](https://github.com/websockets/ws).
+*   **Backend**: [Bun](https://bun.sh) (JavaScript Runtime), [Koa](https://github.com/koajs/koa), [bun-pty](https://npmjs.com/package/bun-pty), [WebSocket](https://github.com/websockets/ws).
 *   **Frontend**: [Vanilla JS](http://vanilla-js.com/) 😝, [xterm.js](https://github.com/xtermjs/xterm.js), [Monaco Editor](https://github.com/microsoft/monaco-editor).
 *   **AI**: Integration via [utilitas](https://github.com/leask/utilitas).
+
+### Why Bun?
+
+Tabminal now runs on Bun runtime for:
+- **Blazing fast startup**: Up to 10x faster than Node.js
+- **Superior performance**: Better HTTP throughput and I/O operations
+- **Native TypeScript**: Built-in TypeScript support without compilation
+- **Modern ecosystem**: First-class support for modern JavaScript features
 
 ## 📄 License
 [MIT](LICENSE)

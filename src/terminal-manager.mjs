@@ -3,7 +3,7 @@ import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
-import pty from 'node-pty';
+import { spawn as pty } from 'bun-pty';
 import { TerminalSession } from './terminal-session.mjs';
 import * as persistence from './persistence.mjs';
 
@@ -168,7 +168,7 @@ precmd_functions+=(_tabminal_zsh_apply_prompt_marker)
         // Initial save
         this.saveSessionState(session);
 
-        ptyProcess.onExit((details) => {
+        const exitHandler = ptyProcess.onExit((details) => {
             console.log(`[Manager] PTY exited for session ${id}:`, JSON.stringify(details));
             // Don't auto-remove session - let it stay so it can be displayed in UI
             // This allows users to see historical sessions and manually manage them
@@ -276,7 +276,7 @@ precmd_functions+=(_tabminal_zsh_apply_prompt_marker)
         this.disposing = true;
         for (const session of this.sessions.values()) {
             try {
-                session.pty.kill('SIGHUP');
+                session.dispose();
             } catch (_err) {
                 // ignore
             }
