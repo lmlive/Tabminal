@@ -23,7 +23,6 @@ const editorPane = document.getElementById('editor-pane');
 
 // #region Configuration
 const HEARTBEAT_INTERVAL_MS = 1000;
-const MAX_UPLOAD_SIZE = 10 * 1024 * 1024; // 10MB
 // #endregion
 
 // #region Sidebar Toggle (Mobile)
@@ -44,98 +43,14 @@ if (sidebarToggle && sidebar && sidebarOverlay) {
 
     sidebarOverlay.addEventListener('click', closeSidebar);
 
-        // Close sidebar when a tab is clicked (Mobile UX)
-        if (tabListEl) {
-            tabListEl.addEventListener('click', (e) => {
-                // Only close if we actually clicked a tab item (not empty space)
-                if (e.target.closest('.tab-item') && window.innerWidth < 768) {
-                    closeSidebar();
-                }
-            });
-        }
-    }
-}
-// #endregion
-
-// #region File Upload Manager
-const fileInputs = new Map();
-const uploadingSessions = new Set();
-
-function handleFileUpload(sessionId, cwd) {
-    if (!fileInputs.has(sessionId)) {
-        const input = document.createElement('input');
-        input.type = 'file';
-        input.style.display = 'none';
-        input.multiple = false;
-        document.body.appendChild(input);
-        fileInputs.set(sessionId, input);
-    }
-
-    const input = fileInputs.get(sessionId);
-
-    if (uploadingSessions.has(sessionId)) {
-        showNotification('Upload in progress. Please wait...', 'warning');
-        return;
-    }
-
-    input.onchange = async (e) => {
-        const file = e.target.files[0];
-        if (!file) return;
-
-        if (file.size > MAX_UPLOAD_SIZE) {
-            showNotification('File too large (max 10MB)', 'error');
-            return;
-        }
-
-        await uploadFile(sessionId, cwd, file);
-
-        input.value = '';
-    };
-
-    input.click();
-}
-
-async function uploadFile(sessionId, cwd, file) {
-    uploadingSessions.add(sessionId);
-
-    const formData = new FormData();
-    formData.append('file', file);
-    formData.append('sessionId', sessionId);
-    formData.append('targetPath', cwd);
-
-    try {
-        showNotification(`Uploading ${file.name}...`);
-
-        const response = await auth.fetch('/api/fs/upload', {
-            method: 'POST',
-            body: formData
-        });
-
-        const result = await response.json();
-
-        if (result.success) {
-            showNotification(`✓ Uploaded: ${result.filename}`);
-            const sizeKB = (result.size / 1024).toFixed(2);
-            const session = state.sessions.get(sessionId);
-            if (session && session.mainTerm) {
-                session.mainTerm.writeln(`\x1b[32m✓\x1b[0m Uploaded: ${result.filename} (${sizeKB} KB)`);
+    // Close sidebar when a tab is clicked (Mobile UX)
+    if (tabListEl) {
+        tabListEl.addEventListener('click', (e) => {
+            // Only close if we actually clicked a tab item (not empty space)
+            if (e.target.closest('.tab-item') && window.innerWidth < 768) {
+                closeSidebar();
             }
-        } else {
-            showNotification(`✗ Upload failed: ${result.error}`, 'error');
-        }
-    } catch (error) {
-        console.error('[Upload Error]', error);
-        showNotification('✗ Upload failed. Check console for details.', 'error');
-    } finally {
-        uploadingSessions.delete(sessionId);
-    }
-}
-
-function cleanupFileInput(sessionId) {
-    if (fileInputs.has(sessionId)) {
-        const input = fileInputs.get(sessionId);
-        input.remove();
-        fileInputs.delete(sessionId);
+        });
     }
 }
 // #endregion
@@ -1690,16 +1605,6 @@ function createTabElement(session) {
         }
     };
     tab.appendChild(toggleEditorBtn);
-
-    const uploadBtn = document.createElement('button');
-    uploadBtn.className = 'upload-tab-button';
-    uploadBtn.innerHTML = '<svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>';
-    uploadBtn.title = 'Upload File to Current Directory';
-    uploadBtn.onclick = (e) => {
-        e.stopPropagation();
-        handleFileUpload(session.id, session.cwd);
-    };
-    tab.appendChild(uploadBtn);
     
     const fileTree = document.createElement('div');
     fileTree.className = 'tab-file-tree';
@@ -2069,8 +1974,6 @@ async function closeSession(id) {
 
     try {
         await auth.fetch(`/api/sessions/${id}`, { method: 'DELETE' });
-
-        cleanupFileInput(id);
 
         const sessionIds = Array.from(state.sessions.keys());
         const index = sessionIds.indexOf(id);
