@@ -10,6 +10,7 @@ import Koa from 'koa';
 import serve from 'koa-static';
 import Router from '@koa/router';
 import bodyParser from 'koa-bodyparser';
+import { koaBody } from 'koa-body';
 import { WebSocketServer } from 'ws';
 
 import { TerminalManager } from './terminal-manager.mjs';
@@ -112,6 +113,16 @@ if (embeddedAssets) {
 
 // Body Parser
 app.use(bodyParser());
+
+// Multipart Body Parser for file uploads
+app.use(koaBody({
+    multipart: true,
+    formidable: {
+        maxFileSize: 10 * 1024 * 1024,
+        keepExtensions: true,
+        multiples: false
+    }
+}));
 
 // Auth Middleware for API routes
 app.use(authMiddleware);

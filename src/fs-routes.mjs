@@ -9,7 +9,9 @@ const resolvePath = (baseDir, targetPath) => {
 };
 
 export const setupFsRoutes = (router) => {
-    const baseDir = process.cwd(); // Or config.homeDir if you want to restrict/change it
+    const baseDir = process.cwd();
+
+    const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
 
     // List directory
     router.get('/api/fs/list', async (ctx) => {
@@ -120,6 +122,57 @@ export const setupFsRoutes = (router) => {
             }
         } catch (err) {
             ctx.status = 404;
+        }
+    });
+
+    // Upload file to session's current directory
+    router.post('/api/fs/upload', async (ctx) => {
+        const { sessionId, targetPath } = ctx.request.body;
+        const uploadedFile = ctx.request.files?.file;
+
+        if (!uploadedFile) {
+            ctx.status = 400;
+            ctx.body = { error: 'No file uploaded' };
+            return;
+        }
+
+        if (!sessionId) {
+            ctx.status = 400;
+            ctx.body = { error: 'Session ID required' };
+            return;
+        }
+
+        const resolvedPath = path.resolve(baseDir, targetPath || '.');
+
+        if (!resolvedPath.startsWith(baseDir)) {
+            ctx.status = 403;
+            ctx.body = { error: 'Invalid path traversal attempt' };
+            return;
+        }
+
+        if (uploadedFile.size > MAX_FILE_SIZE) {
+            ctx.status = 400;
+            ctx.body = { error: 'File too large (max 10MB)' };
+            return;
+        }
+
+        const filename = uploadedFile.originalFilename || uploadedFile.name || 'uploaded-file';
+        const targetFilePath = path.join(resolvedPath, filename);
+
+        try {
+            const sourcePath = uploadedFile.filepath || uploadedFile.path;
+            await fs.rename(sourcePath, targetFilePath);
+
+            ctx.body = {
+                success: true,
+                filename: filename,
+                size: uploadedFile.size,
+                path: targetFilePath
+            };
+        } catch (err) {
+            console.error('[FS Upload Error]', err);
+            ctx.status = 500;
+            ctx.body = { error: err.message };
         }
     });
 };

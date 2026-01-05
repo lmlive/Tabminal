@@ -321,6 +321,11 @@ body {
     .tab-item {
         min-height: 80px !important;
     }
+
+    .upload-tab-button {
+        width: 32px;
+        height: 32px;
+    }
 }
 
 /* Touch Device Typography Adjustments (Fonts only) */
@@ -1347,6 +1352,50 @@ kbd {
 
 .toggle-editor-btn:active {
     transform: translateY(1px);
+}
+
+.upload-tab-button {
+    position: absolute;
+    top: 4px;
+    right: 36px;
+    width: 28px;
+    height: 28px;
+    border-radius: 4px;
+    background-color: rgba(0, 43, 54, 0.6);
+    backdrop-filter: blur(4px);
+    -webkit-backdrop-filter: blur(4px);
+    color: var(--text-highlight);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    opacity: 0;
+    transition: all 0.2s ease;
+    z-index: 10;
+    padding: 0;
+}
+
+.upload-tab-button:hover {
+    background-color: rgba(2, 119, 189, 0.8) !important;
+    border-color: rgba(2, 119, 189, 1);
+    opacity: 1;
+}
+
+.upload-tab-button:active {
+    transform: translateY(1px);
+}
+
+.tab-item:hover .upload-tab-button {
+    opacity: 1;
+}
+
+.tab-item.active .upload-tab-button {
+    opacity: 1;
+}
+
+.tab-item.active:hover .upload-tab-button {
+    opacity: 0.8;
 }
 
 .tab-file-tree {
