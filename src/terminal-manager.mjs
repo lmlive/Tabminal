@@ -6,6 +6,7 @@ import os from 'node:os';
 import { spawn as pty } from 'bun-pty';
 import { TerminalSession } from './terminal-session.mjs';
 import * as persistence from './persistence.mjs';
+import { ensureShellTools } from './utils/shell-tools.mjs';
 
 function resolveShell() {
     if (process.platform === 'win32') {
@@ -47,8 +48,8 @@ export class TerminalManager {
         
         const env = { ...process.env };
         
-        // Inject shell tools
-        const shellToolsPath = path.join(process.cwd(), 'shell');
+        // Inject shell tools (extracted or filesystem)
+        const shellToolsPath = ensureShellTools();
         env.PATH = `${shellToolsPath}:${env.PATH}`;
 
         let args = [];
@@ -138,14 +139,18 @@ precmd_functions+=(_tabminal_zsh_apply_prompt_marker)
         const cols = restoredData ? restoredData.cols : this.lastCols;
         const rows = restoredData ? restoredData.rows : this.lastRows;
 
-        const ptyProcess = pty.spawn(shell, args, {
-            name: 'xterm-256color',
-            cols: cols,
-            rows: rows,
-            cwd: initialCwd,
-            env: env,
-            encoding: 'utf8'
-        });
+        const ptyProcess = pty(
+            shell,
+            args,
+            {
+                name: 'xterm-256color',
+                cols: cols,
+                rows: rows,
+                cwd: initialCwd,
+                env: env,
+                encoding: 'utf8'
+            }
+        );
 
         const session = new TerminalSession(ptyProcess, {
             id,

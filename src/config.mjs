@@ -5,8 +5,8 @@ import crypto from 'node:crypto';
 import { parseArgs } from 'node:util';
 
 const DEFAULT_CONFIG = {
-    host: '127.0.0.1',
-    port: 9846,
+    host: '0.0.0.0',
+    port: 5566,
     heartbeatInterval: 10000,
     historyLimit: 524288,
     acceptTerms: false,
@@ -111,8 +111,8 @@ Usage:
   node src/server.mjs [options]
 
 Options:
-  --host, -h            Host to bind to (default: 127.0.0.1)
-  --port, -p            Port to listen on (default: 9846)
+  --host, -h            Host to bind to (default: 0.0.0.0)
+  --port, -p            Port to listen on (default: 5566)
   --password, -a        Set access password
   --openrouter-key, -k  Set OpenRouter API Key
   --model, -m           Set AI Model

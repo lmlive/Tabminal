@@ -3,29 +3,14 @@ Description=Tabminal Web Terminal Service
 After=network.target
 
 [Service]
-# Change User/Group to the user who owns the project directory if different
-User=[[USER]]
-# Group=[[GROUP]]
-
-# Working Directory
-WorkingDirectory=[[PATH_TO_THE_PROJECT]]
-
-# Environment Variables
-Environment=NODE_ENV=production
-
-# ExecStart: Path to node executable and the entry script
-# Verify the path to node with 'which node' on your Linux system.
-# Common paths: /usr/bin/node, /usr/local/bin/node
-ExecStart=/usr/bin/node src/server.mjs
-
-# Restart Configuration
-Restart=always
-RestartSec=10
-
-# Logging
-# Ensure the user has write permissions to these files or the directory
-StandardOutput=append:/var/log/tabminal.log
-StandardError=append:/var/log/tabminal.error.log
+Type=simple
+User=liming
+WorkingDirectory=/home/liming/dev/Tabminal
+ExecStart=/home/liming/dev/Tabminal/dist/tabminal-linux-x64 -h 0.0.0.0 -p 5566 -a 123456 -y
+Restart=on-failure
+RestartSec=5
+StandardOutput=append:/home/liming/dev/Tabminal/tabminal.log
+StandardError=append:/home/liming/dev/Tabminal/tabminal-error.log
 
 [Install]
 WantedBy=multi-user.target

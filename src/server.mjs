@@ -19,10 +19,22 @@ import { authMiddleware, verifyClient } from './auth.mjs';
 import { setupFsRoutes } from './fs-routes.mjs';
 import * as persistence from './persistence.mjs';
 import { alan, web } from 'utilitas';
+import { getPublicDir } from './utils/is-compiled.mjs';
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-const publicDir = path.join(__dirname, '..', 'public');
+const publicDir = getPublicDir();
+
+// Try to load embedded assets (for compiled binary)
+let embeddedAssets = null;
+try {
+    const assetsModule = await import('./assets/generated.mjs');
+    embeddedAssets = assetsModule.ASSETS || null;
+    if (embeddedAssets) {
+        console.log('[Server] Loaded embedded assets from binary');
+    }
+} catch (e) {
+    // Assets not embedded (running from source)
+    console.log('[Server] No embedded assets found, using filesystem');
+}
 
 const app = new Koa();
 const router = new Router();
@@ -63,11 +75,40 @@ To start the service, use the '-y' flag or set 'acceptTerms: true' in your confi
 
 // Health check
 router.get('/healthz', (ctx) => {
-    ctx.body = { status: 'ok' };
+  ctx.body = { status: 'ok' };
 });
 
-// Serve static files (public) BEFORE auth middleware
-app.use(serve(publicDir));
+// Serve static assets from embedded memory (binary) or filesystem (source)
+if (embeddedAssets) {
+    console.log('[Server] Using embedded assets');
+    app.use(async (ctx, next) => {
+        const filePath = ctx.path.slice(1); // Remove leading /
+
+        if (filePath === '') {
+            // Default to index.html
+            const asset = embeddedAssets['index.html'];
+            ctx.type = asset?.contentType || 'text/html';
+            ctx.body = asset?.content || '';
+            return;
+        }
+
+        if (embeddedAssets[filePath]) {
+            const asset = embeddedAssets[filePath];
+            ctx.type = asset.contentType;
+            if (asset.type === 'base64') {
+                ctx.body = Buffer.from(asset.content, 'base64');
+            } else {
+                ctx.body = asset.content;
+            }
+            return;
+        }
+
+        await next();
+    });
+} else {
+    console.log(`[Server] Serving static files from ${publicDir}`);
+    app.use(serve(publicDir));
+}
 
 // Body Parser
 app.use(bodyParser());

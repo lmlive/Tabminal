@@ -295,13 +295,6 @@ export class TerminalSession {
         }
     }
 
-    dispose() {
-        this.stopTitlePolling();
-        this.clients.clear();
-        this.dataSubscription?.dispose?.();
-        this.exitSubscription?.dispose?.();
-    }
-
     resize(cols, rows) {
         this._ptyCols = cols;
         this._ptyRows = rows;
