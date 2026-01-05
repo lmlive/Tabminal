@@ -895,6 +895,42 @@ body {
     background-color: #2aa198;
 }
 
+.modal-buttons {
+    display: flex;
+    gap: 10px;
+    margin-top: 1.5rem;
+}
+
+.modal-buttons button {
+    width: 50%;
+    padding: 10px;
+    border: none;
+    border-radius: 4px;
+    font-size: 1rem;
+    cursor: pointer;
+    transition: background-color 0.2s;
+    font-family: inherit;
+}
+
+.btn-cancel {
+    background-color: var(--bg-surface);
+    border: 1px solid var(--border-color);
+    color: var(--text-base);
+}
+
+.btn-cancel:hover {
+    background-color: rgba(255,255,255, 0.1);
+}
+
+.btn-confirm {
+    background-color: #dc322f;
+    color: white;
+}
+
+.btn-confirm:hover {
+    background-color: #cb4b16;
+}
+
 .error-message {
     color: #dc322f;
     margin-top: 1rem;

@@ -156,3 +156,84 @@ Tabminal now runs on Bun runtime for:
 
 ## 📄 License
 [MIT](LICENSE)
+
+## 📦 Binary Distribution
+
+Tabminal can be built as standalone binary executables using Bun's `--compile` feature. This allows running Tabminal without installing Bun runtime.
+
+### Building Binaries
+
+```bash
+# Build for current platform (Linux/macOS/Windows)
+npm run build:binary
+
+# Build for specific platforms
+npm run build:binary:linux       # Linux x64 (103MB)
+npm run build:binary:macos       # macOS ARM64
+npm run build:binary:windows     # Windows x64
+npm run build:binary:all         # All platforms
+```
+
+### Binary Size
+
+- **Current size**: ~103MB per platform
+- **Size breakdown**:
+  - Bun runtime: ~90MB (cannot be reduced)
+  - Application: ~10MB
+  - Embedded assets: ~260KB (negligible)
+- **Why 103MB?** Bun embeds entire runtime, similar to Go binaries (80-120MB)
+
+For detailed size optimization analysis, see [SIZE_OPTIMIZATION_SUMMARY.md](docs/SIZE_OPTIMIZATION_SUMMARY.md).
+
+### Running the Binary
+
+```bash
+# Make executable (Linux/macOS)
+chmod +x dist/tabminal-linux-x64
+
+# Run
+./dist/tabminal-linux-x64 -y
+
+# Or with custom password
+./dist/tabminal-linux-x64 -y -a your-password
+```
+
+All CLI options work with binaries:
+- `-y, --accept-terms` - Accept security warning
+- `-p, --port <port>` - Set port
+- `-a, --passwd <password>` - Set password
+- `-h, --host <address>` - Bind address
+
+### Binary vs Source
+
+| Feature | Source | Binary |
+|---------|--------|--------|
+| **Size** | ~5MB (source) | ~103MB (binary) |
+| **Runtime** | Requires Bun | Bun embedded |
+| **Setup** | `bun install` | Download & run |
+| **Updates** | Git pull | Download binary |
+| **Portability** | Needs Bun | Standalone |
+
+### Configuration
+
+Binary uses same configuration as source:
+- Config: `~/.tabminal/config.json`
+- Sessions: `~/.tabminal/sessions/`
+- Environment: `TABMINAL_*` prefix
+
+### Performance
+
+Binary performance is **identical** to source version:
+- **Startup**: ~0.3s (same as source)
+- **Memory**: ~180MB (same as source)
+- **Runtime**: Identical (Bun runtime embedded)
+
+### Distribution
+
+Binaries are ideal for:
+- **Production deployment**: Single file, no dependencies
+- **Cloud servers**: No Bun installation needed
+- **End users**: Download and run
+
+For complete usage guide, see [BINARY_USAGE.md](docs/BINARY_USAGE.md).
+

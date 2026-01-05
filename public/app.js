@@ -1588,7 +1588,7 @@ function createTabElement(session) {
     closeBtn.title = 'Close Terminal';
     closeBtn.onclick = (e) => {
         e.stopPropagation();
-        auth.fetch(`/api/sessions/${session.id}`, { method: 'DELETE' });
+        closeSession(session.id);
     };
     tab.appendChild(closeBtn);
 
@@ -1964,12 +1964,20 @@ function shortenPath(path) {
 // #endregion
 
 async function closeSession(id) {
+    if (pendingCloseSessionId !== id) {
+        pendingCloseSessionId = id;
+        const session = state.sessions.get(id);
+        const sessionTitle = session ? session.title : 'Terminal';
+        showConfirmModal(`Are you sure you want to close "${sessionTitle}"?`);
+        return;
+    }
+
     try {
         await auth.fetch(`/api/sessions/${id}`, { method: 'DELETE' });
-        
+
         const sessionIds = Array.from(state.sessions.keys());
         const index = sessionIds.indexOf(id);
-        
+
         if (state.activeSessionId === id) {
             let nextId = null;
             if (index > 0) {
@@ -1977,7 +1985,7 @@ async function closeSession(id) {
             } else if (index < sessionIds.length - 1) {
                 nextId = sessionIds[index + 1];
             }
-            
+
             if (nextId) {
                 switchToSession(nextId);
             } else {
@@ -1985,11 +1993,12 @@ async function closeSession(id) {
                 terminalEl.innerHTML = '';
             }
         }
-        
+
         await syncSessions();
-        
+
     } catch (error) {
         console.error('Failed to close session:', error);
+        hideConfirmModal();
     }
 }
 
@@ -2046,12 +2055,47 @@ window.addEventListener('beforeunload', () => {
     }
 });
 
+let pendingCloseSessionId = null;
+
+function showConfirmModal(message) {
+    const confirmModal = document.getElementById('confirm-modal');
+    const confirmMessage = document.getElementById('confirm-message');
+    if (confirmModal && confirmMessage) {
+        confirmMessage.textContent = message;
+        confirmModal.style.display = 'flex';
+    }
+}
+
+function hideConfirmModal() {
+    const confirmModal = document.getElementById('confirm-modal');
+    if (confirmModal) {
+        confirmModal.style.display = 'none';
+    }
+    pendingCloseSessionId = null;
+}
+
 async function initApp() {
     if (!auth.isAuthenticated) {
         auth.showLoginModal();
         return;
     }
-    
+
+    const confirmCancelBtn = document.getElementById('confirm-cancel');
+    const confirmOkBtn = document.getElementById('confirm-ok');
+
+    if (confirmCancelBtn) {
+        confirmCancelBtn.addEventListener('click', hideConfirmModal);
+    }
+
+    if (confirmOkBtn) {
+        confirmOkBtn.addEventListener('click', async () => {
+            if (pendingCloseSessionId) {
+                await closeSession(pendingCloseSessionId);
+                hideConfirmModal();
+            }
+        });
+    }
+
     auth.startHeartbeat();
     await syncSessions();
     // If no sessions, create one

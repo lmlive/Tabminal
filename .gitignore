@@ -123,3 +123,7 @@ dist
 
 # Tabminal specific
 /config.json
+
+# Compiled binaries (too large for git)
+tabminal-*
+*.exe
