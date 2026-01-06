@@ -14,67 +14,18 @@ const TARGETS = {
   'windows-x64': 'bun-windows-x64',
 };
 
+// We no longer embed the library in the JS code, instead we copy it to the output directory
+// The pty-wrapper.mjs now looks for the library in the same directory as the executable
 async function embedPtyLib(target) {
-  const platform = target.split('-')[0];
-  const arch = target.split('-')[1];
-
-  let libFileName;
-  if (platform === 'darwin') {
-    libFileName = arch === 'arm64' ? 'librust_pty_arm64.dylib' : 'librust_pty.dylib';
-  } else if (platform === 'win32') {
-    libFileName = 'rust_pty.dll';
-  } else { // linux
-    libFileName = arch === 'arm64' ? 'librust_pty_arm64.so' : 'librust_pty.so';
-  }
-
-  const sourceLibPath = path.join('node_modules', 'bun-pty', 'rust-pty', 'target', 'release', libFileName);
-
-  try {
-    await fs.access(sourceLibPath);
-
-    // Read the library file and convert to base64
-    const libBuffer = await fs.readFile(sourceLibPath);
-    const libBase64 = libBuffer.toString('base64');
-
-    // Read the pty wrapper file
-    const wrapperPath = 'src/utils/pty-wrapper.mjs';
-    let wrapperContent = await fs.readFile(wrapperPath, 'utf8');
-
-    // Replace the placeholder with the actual library data
-    wrapperContent = wrapperContent.replace('__LIBRARY_DATA_PLACEHOLDER__', libBase64);
-
-    // Write the modified wrapper back
-    await fs.writeFile(wrapperPath, wrapperContent);
-
-    console.log(`📦 Embedded ${libFileName} into pty wrapper`);
-    return true;
-  } catch (error) {
-    console.warn(`⚠️  Warning: Could not embed ${libFileName}. This may cause runtime errors.`);
-    console.warn(`   Expected path: ${sourceLibPath}`);
-    console.warn(`   Error: ${error.message}`);
-    return false;
-  }
+  // This function is kept for compatibility but doesn't need to do anything
+  // The library will be copied by the copyPtyLib function
+  console.log('📦 Library embedding handled by copyPtyLib function');
+  return true;
 }
 
 async function restorePtyLibPlaceholder() {
-  try {
-    const wrapperPath = 'src/utils/pty-wrapper.mjs';
-    let wrapperContent = await fs.readFile(wrapperPath, 'utf8');
-
-    // Restore the placeholder
-    wrapperContent = wrapperContent.replace(/__LIBRARY_DATA_PLACEHOLDER__.*'/, '__LIBRARY_DATA_PLACEHOLDER__');
-
-    // Ensure the placeholder is properly restored
-    if (!wrapperContent.includes('__LIBRARY_DATA_PLACEHOLDER__')) {
-      // If the base64 string is very long, we need to replace the entire thing
-      wrapperContent = wrapperContent.replace(/const LIBRARY_DATA_PLACEHOLDER = '[^']*';/, "const LIBRARY_DATA_PLACEHOLDER = '__LIBRARY_DATA_PLACEHOLDER__';");
-    }
-
-    await fs.writeFile(wrapperPath, wrapperContent);
-    console.log('📦 Restored pty wrapper placeholder');
-  } catch (error) {
-    console.warn(`⚠️  Warning: Could not restore pty wrapper placeholder: ${error.message}`);
-  }
+  // This function is kept for compatibility but doesn't need to do anything
+  console.log('📦 No placeholder to restore');
 }
 
 async function copyPtyLib(target, outputFile) {
