@@ -205,7 +205,7 @@ In previous versions, you may have encountered this error:
 error: librust_pty shared library not found
 ```
 
-This happened because the binary depended on the `librust_pty` shared library. The build process has been enhanced to embed the required library directly into the binary, so this error should no longer occur.
+This happened because the binary depended on the `librust_pty` shared library. The build process has been enhanced to copy the required library to the same directory as the binary, so this error should no longer occur.
 
 You can now run the binary directly:
 ```bash
@@ -217,8 +217,8 @@ You can now run the binary directly:
 ```
 
 The build process creates:
-- `tabminal-linux-x64` - Main binary (with embedded library)
-- `librust_pty.so` - Required shared library (copied for compatibility)
+- `tabminal-linux-x64` - Main binary
+- `librust_pty.so` - Required shared library (copied to same directory)
 - `start-tabminal-linux-x64.sh` - Startup script (Linux/macOS)
 
 All CLI options work with binaries:
