@@ -5,7 +5,7 @@ import fs from 'node:fs';
 import AnsiParser from 'node-ansiparser';
 import { alan } from 'utilitas';
 import { config } from './config.mjs';
-import { spawn as pty } from 'bun-pty';
+import { spawn as pty } from './utils/pty-wrapper.mjs';
 
 const execAsync = promisify(exec);
 const WS_STATE_OPEN = 1;

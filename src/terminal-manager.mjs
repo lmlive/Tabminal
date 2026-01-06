@@ -3,7 +3,7 @@ import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
-import { spawn as pty } from 'bun-pty';
+import { spawn as pty } from './utils/pty-wrapper.mjs';
 import { TerminalSession } from './terminal-session.mjs';
 import * as persistence from './persistence.mjs';
 import { ensureShellTools } from './utils/shell-tools.mjs';

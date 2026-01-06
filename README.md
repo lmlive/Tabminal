@@ -191,12 +191,35 @@ For detailed size optimization analysis, see [SIZE_OPTIMIZATION_SUMMARY.md](docs
 # Make executable (Linux/macOS)
 chmod +x dist/tabminal-linux-x64
 
-# Run
+# Run (Note: requires librust_pty shared library)
 ./dist/tabminal-linux-x64 -y
 
 # Or with custom password
 ./dist/tabminal-linux-x64 -y -a your-password
 ```
+
+### Important: librust_pty Library
+
+In previous versions, you may have encountered this error:
+```
+error: librust_pty shared library not found
+```
+
+This happened because the binary depended on the `librust_pty` shared library. The build process has been enhanced to embed the required library directly into the binary, so this error should no longer occur.
+
+You can now run the binary directly:
+```bash
+# Run directly (recommended)
+./tabminal-linux-x64 -y
+
+# Or use the generated startup script (still works)
+./start-tabminal-linux-x64.sh -y
+```
+
+The build process creates:
+- `tabminal-linux-x64` - Main binary (with embedded library)
+- `librust_pty.so` - Required shared library (copied for compatibility)
+- `start-tabminal-linux-x64.sh` - Startup script (Linux/macOS)
 
 All CLI options work with binaries:
 - `-y, --accept-terms` - Accept security warning
