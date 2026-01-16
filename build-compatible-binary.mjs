@@ -7,26 +7,15 @@ import { pipeline } from 'node:stream/promises';
 import { Buffer } from 'buffer';
 
 const TARGETS = {
-  'linux-x64': 'bun-linux-x64',
-  'linux-arm64': 'bun-linux-arm64',
-  'darwin-x64': 'bun-darwin-x64',
-  'darwin-arm64': 'bun-darwin-arm64',
-  'windows-x64': 'bun-windows-x64',
+  'linux-x64-compatible': 'bun-linux-x64',
 };
 
-// Embed the pty library into the assets file before building
+// Import the necessary functions from build-binary.mjs
 async function embedPtyLib(target) {
-  const platform = target.split('-')[0];
-  const arch = target.split('-')[1];
+  const platform = 'linux'; // Force to linux for compatibility build
+  const arch = 'x64'; // Force to x64 for compatibility build
 
-  let libFileName;
-  if (platform === 'darwin') {
-    libFileName = arch === 'arm64' ? 'librust_pty_arm64.dylib' : 'librust_pty.dylib';
-  } else if (platform === 'win32') {
-    libFileName = 'rust_pty.dll';
-  } else { // linux
-    libFileName = arch === 'arm64' ? 'librust_pty_arm64.so' : 'librust_pty.so';
-  }
+  let libFileName = 'librust_pty.so';
 
   const sourceLibPath = path.join('node_modules', 'bun-pty', 'rust-pty', 'target', 'release', libFileName);
 
@@ -38,7 +27,6 @@ async function embedPtyLib(target) {
     const libBase64 = libBuffer.toString('base64');
 
     // Instead of creating a separate file, we'll modify the pty-wrapper.mjs file directly
-    // to embed the library content, since Bun's compilation doesn't include dynamic imports
     const ptyWrapperPath = path.join('src', 'utils', 'pty-wrapper.mjs');
     let ptyWrapperContent = await fs.readFile(ptyWrapperPath, 'utf8');
 
@@ -88,7 +76,6 @@ ${endMarker}`;
 }
 
 async function restorePtyLibPlaceholder() {
-  // Restore the original pty-wrapper.mjs file by removing the embedded library content
   const ptyWrapperPath = path.join('src', 'utils', 'pty-wrapper.mjs');
   try {
     let ptyWrapperContent = await fs.readFile(ptyWrapperPath, 'utf8');
@@ -112,17 +99,10 @@ async function restorePtyLibPlaceholder() {
 }
 
 async function copyPtyLib(target, outputFile) {
-  const platform = target.split('-')[0];
-  const arch = target.split('-')[1];
+  const platform = 'linux';
+  const arch = 'x64';
 
-  let libFileName;
-  if (platform === 'darwin') {
-    libFileName = arch === 'arm64' ? 'librust_pty_arm64.dylib' : 'librust_pty.dylib';
-  } else if (platform === 'win32') {
-    libFileName = 'rust_pty.dll';
-  } else { // linux
-    libFileName = arch === 'arm64' ? 'librust_pty_arm64.so' : 'librust_pty.so';
-  }
+  let libFileName = 'librust_pty.so';
 
   const sourceLibPath = path.join('node_modules', 'bun-pty', 'rust-pty', 'target', 'release', libFileName);
   const outputDir = path.dirname(outputFile);
@@ -141,131 +121,79 @@ async function copyPtyLib(target, outputFile) {
   }
 }
 
-async function build(target) {
-  const bunTarget = TARGETS[target];
-  if (!bunTarget) {
-    console.error(`❌ Unknown target: ${target}`);
-    console.log(`Available targets: ${Object.keys(TARGETS).join(', ')}`);
-    process.exit(1);
-  }
-
-  let outputFile = `dist/tabminal-${target}`;
-  if (target.includes('windows')) {
-    outputFile += '.exe';
-  }
-
-  console.log(`🏗️  Building for ${target} (${bunTarget})...`);
+async function createCompatibilityBinary() {
+  const outputFile = `dist/tabminal-linux-x64-compatible`;
+  const target = 'linux-x64-compatible';
+  
+  console.log(`🔧 Building compatibility binary for older Linux systems...`);
   console.log(`📦 Output: ${outputFile}`);
 
   try {
     // Embed the library into the wrapper before building
     const embedded = await embedPtyLib(target);
 
-    // Build with standard Bun target
+    console.log('🌍 Using Node.js target for maximum CPU compatibility...');
     if (embedded) {
-      await $`bun build src/server.mjs --compile --outfile ${outputFile} --target ${bunTarget}`;
+      await $`bun build src/server.mjs --compile --outfile ${outputFile} --target node`;
     } else {
-      await $`bun build src/server.mjs --compile --outfile ${outputFile} --target ${bunTarget}`;
+      await $`bun build src/server.mjs --compile --outfile ${outputFile} --target node`;
     }
 
     const statResult = await $`stat -c%s ${outputFile}`;
     const sizeBytes = parseInt(statResult.stdout.toString().trim());
     const sizeMB = (sizeBytes / (1024 * 1024)).toFixed(1);
-    console.log(`✅ Built: ${outputFile} (${sizeMB}MB)`);
+    console.log(`✅ Built compatibility binary: ${outputFile} (${sizeMB}MB)`);
 
     // Copy the required pty library for the target platform alongside the binary
-    // This is necessary for the binary to find the library at runtime
     const copiedLibPath = await copyPtyLib(target, outputFile);
 
-    // Create startup script for non-Windows platforms to ensure the library is found
-    if (!target.includes('windows')) {
-      await createStartupScript(target, outputFile);
-    }
+    // Create startup script
+    const outputDir = path.dirname(outputFile);
+    const binaryName = path.basename(outputFile);
+    const scriptName = `start-${path.basename(outputFile, path.extname(outputFile))}.sh`;
+    const scriptPath = path.join(outputDir, scriptName);
 
-    // Restore the placeholder in the wrapper file after build
-    await restorePtyLibPlaceholder();
+    const scriptContent = `#!/bin/bash
 
-  } catch (error) {
-    // Restore the placeholder even if build fails
-    await restorePtyLibPlaceholder();
-    console.error(`❌ Build failed for ${target}:`, error);
-    throw error;
-  }
-}
-
-async function createStartupScript(target, outputFile) {
-  const outputDir = path.dirname(outputFile);
-  const binaryName = path.basename(outputFile);
-  const scriptName = `start-${path.basename(outputFile, path.extname(outputFile))}.sh`;
-  const scriptPath = path.join(outputDir, scriptName);
-
-  // Determine the correct library name based on architecture
-  const arch = target.split('-')[1];
-  const libFileName = arch === 'arm64' ? 'librust_pty_arm64.so' : 'librust_pty.so';
-
-  const scriptContent = `#!/bin/bash
-
-# Tabminal startup script for ${target}
+# Tabminal compatibility startup script for older Linux systems
 # This script ensures the required librust_pty library is found when running the binary
 
 # Get the directory where this script is located
 SCRIPT_DIR="$(cd "$(dirname "${'$'}{BASH_SOURCE[0]}")" && pwd)"
 
 # Set the library path to the directory containing the binary
-export BUN_PTY_LIB="$${'SCRIPT_DIR'}/${libFileName}"
+export BUN_PTY_LIB="$${'SCRIPT_DIR'}/librust_pty.so"
 
 # Run the main application with all passed arguments
 "$${'SCRIPT_DIR'}/${binaryName}" "$${'@'}"
 `;
 
-  try {
-    await fs.writeFile(scriptPath, scriptContent);
-    await $`chmod +x ${scriptPath}`;
-    console.log(`📄 Created startup script: ${scriptPath}`);
-  } catch (error) {
-    console.warn(`⚠️  Warning: Could not create startup script:`, error);
-  }
-}
-
-async function main() {
-  const args = process.argv.slice(2);
-
-  if (args.length === 0) {
-    const platform = process.platform;
-    const arch = process.arch.replace('x86_64', 'x64').replace('arm64', 'arm64');
-    const target = `${platform}-${arch}`;
-
-    console.log(`🎯 No target specified, building for current platform: ${target}`);
-    await build(target);
-    return;
-  }
-
-  if (args.includes('--all')) {
-    console.log(`🌍 Building for all platforms...`);
-    for (const target of Object.keys(TARGETS)) {
-      await build(target);
+    try {
+      await fs.writeFile(scriptPath, scriptContent);
+      await $`chmod +x ${scriptPath}`;
+      console.log(`📄 Created startup script: ${scriptPath}`);
+    } catch (error) {
+      console.warn(`⚠️  Warning: Could not create startup script:`, error);
     }
-    console.log('✅ All builds complete!');
-    return;
-  }
 
-  const targetIdx = args.indexOf('--target');
-  if (targetIdx !== -1 && args[targetIdx + 1]) {
-    const target = args[targetIdx + 1];
-    await build(target);
-    return;
-  }
+    // Restore the placeholder in the wrapper file after build
+    await restorePtyLibPlaceholder();
 
-  console.error('❌ Invalid arguments');
-  console.log('Usage:');
-  console.log('  bun run build:binary                    # Build for current platform');
-  console.log('  bun run build:binary --target <target>   # Build for specific target');
-  console.log('  bun run build:binary --all               # Build for all platforms');
-  console.log(`\nAvailable targets: ${Object.keys(TARGETS).join(', ')}`);
-  process.exit(1);
+    console.log(`\n💡 Usage:`);
+    console.log(`   ./${scriptName} -a your_password -p 8080`);
+    console.log(`   or directly: ./${binaryName} -a your_password -p 8080`);
+    console.log(`\n🔄 If this version still fails, try rebuilding PTY library with:`);
+    console.log(`   cd node_modules/bun-pty && cargo build --release --target x86_64-unknown-linux-gnu`);
+
+  } catch (error) {
+    // Restore the placeholder even if build fails
+    await restorePtyLibPlaceholder();
+    console.error(`❌ Compatibility build failed:`, error);
+    throw error;
+  }
 }
 
-main().catch((error) => {
+createCompatibilityBinary().catch((error) => {
   console.error('💥 Fatal error:', error);
   process.exit(1);
 });

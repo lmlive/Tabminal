@@ -1,0 +1,72 @@
+# 多阶段构建，针对旧架构优化
+FROM node:18-alpine AS builder
+
+# 安装必要的构建工具
+RUN apk add --no-cache \
+    gcc \
+    g++ \
+    make \
+    python3 \
+    curl \
+    git
+
+# 安装Bun
+RUN curl -fsSL https://bun.sh/install | bash
+ENV PATH="/root/.bun/bin:$PATH"
+
+# 设置工作目录
+WORKDIR /app
+
+# 复制package文件
+COPY package.json bun.lock ./
+
+# 安装依赖
+RUN bun install --frozen-lockfile
+
+# 复制源代码
+COPY . .
+
+# 构建资源
+RUN bun run build-assets
+
+# 构建兼容性二进制文件 - 使用node目标确保最大兼容性
+RUN bun build src/server.mjs \
+    --compile \
+    --outfile tabminal-compat \
+    --target node
+
+# 最终运行阶段
+FROM node:18-alpine AS runtime
+
+# 安装运行时依赖
+RUN apk add --no-cache \
+    bash \
+    coreutils \
+    curl \
+    tmux \
+    htop \
+    procps
+
+WORKDIR /app
+
+# 从构建阶段复制二进制文件
+COPY --from=builder /app/tabminal-compat .
+COPY --from=builder /app/node_modules/bun-pty/rust-pty/target/release/librust_pty.so .
+
+# 复制必要的静态资源
+COPY --from=builder /app/public ./public
+
+# 设置权限
+RUN chmod +x tabminal-compat librust_pty.so
+
+# 创建启动脚本
+RUN echo '#!/bin/bash\n\
+export BUN_PTY_LIB="/app/librust_pty.so"\n\
+exec /app/tabminal-compat "$@"' > start-tabminal.sh && \
+    chmod +x start-tabminal.sh
+
+# 暴露端口
+EXPOSE 8080
+
+# 设置入口点
+ENTRYPOINT ["./start-tabminal.sh"]

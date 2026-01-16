@@ -7,6 +7,21 @@
     "tabminal": "./src/server.mjs"
   },
   "main": "src/server.mjs",
+  "pkg": {
+    "scripts": [
+      "src/**/*.mjs",
+      "public/**/*"
+    ],
+    "assets": [
+      "public/**/*"
+    ],
+    "targets": [
+      "node18-linux-x64",
+      "node18-win-x64",
+      "node18-macos-x64"
+    ],
+    "outputPath": "dist-pkg"
+  },
   "scripts": {
     "start": "bun src/server.mjs",
     "dev": "bun --watch src/server.mjs",
@@ -18,6 +33,9 @@
     "build:binary:windows": "bun run build-assets.mjs && bun run build-binary.mjs --target windows-x64",
     "build:binary:all": "bun run build-assets.mjs && bun run build-binary.mjs --all",
     "build:binary:small": "bun build src/server.mjs --compile --outfile dist/tabminal-small",
+    "build:binary:compatible": "bun run build-compatible-binary.mjs",
+    "build:binary:minimal": "bun run build-minimal-binary.mjs",
+    "build:binary:node-pty": "bun run build-node-pty-binary.mjs",
     "test": "bun test",
     "updep": "bun update",
     "test:watch": "bun test --watch",
@@ -51,6 +69,7 @@
     "koa-bodyparser": "^4.4.1",
     "koa-static": "^5.0.0",
     "node-ansiparser": "^2.2.1",
+    "node-pty": "^1.1.0",
     "openai": "^6.10.0",
     "utilitas": "^2001.1.112",
     "ws": "^8.18.3"
